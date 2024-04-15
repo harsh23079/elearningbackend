@@ -3,6 +3,7 @@ const User = require("../models/User");
 const otpGenerator = require("otp-generator");
 const bcrypt = require("bcrypt");
 const Profile = require("../models/Profile");
+var jwt = require("jsonwebtoken");
 
 //sendOTP
 const sendOTP = async (req, res) => {
@@ -118,13 +119,72 @@ const signUp = async (req, res) => {
 //Login
 const Login = async (req, res) => {
   try {
-  } catch (err) {}
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Fields are required.." });
+    }
+    const checkEmail = await User.findOne({ email });
+    if (!checkEmail) {
+      return res.status(401).json({
+        success: false,
+        message: "User is not exist please signUp..!!",
+      });
+    }
+
+    const match = await bcrypt.compare(password, checkEmail.password);
+    if (!match) {
+      return res.status(401).json({
+        success: false,
+        message: "Password is not matched",
+      });
+    }
+    const payLoad = {
+      id: checkEmail._id,
+      email: checkEmail.email,
+      accountType: checkEmail.accountType,
+    };
+    const token = jwt.sign(payLoad, process.env.TOKEN_KEY);
+    checkEmail.password = undefined;
+    checkEmail.token = token;
+
+    return res
+      .cookie("access_token", token, {
+        httpOnly: true,
+        expires: Date.now() + 3 * 24 * 60 * 60 * 1000,
+      })
+      .status(200)
+      .json({ message: "Logged in successfully 😊 👌", checkEmail });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
 };
 
 //changePassword
 const changePassword = async (req, res) => {
   try {
-  } catch (err) {}
+    const { email, newPassword, oldPassword } = req.body;
+    if (!email || !newPassword || !oldPassword) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Fields are required.." });
+    }
+    const checkPassword = User.findOne({ email });
+    const match = await bcrypt.compare(password, checkPassword.password);
+    if (!match) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Old Password is not matched" });
+    }
+
+    const hashNewPassword = bcrypt.hash(newPassword, 10);
+    const response = User.create({ password: hashNewPassword });
+    console.log(response);
+    res.status(200).json({ message: "Password changes successfully" });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
 };
 
 module.exports = { sendOTP, signUp, Login, changePassword };
