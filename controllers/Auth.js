@@ -1,6 +1,8 @@
 const OTP = require("../models/OTP");
 const User = require("../models/User");
 const otpGenerator = require("otp-generator");
+const bcrypt = require("bcrypt");
+const Profile = require("../models/Profile");
 
 //sendOTP
 const sendOTP = async (req, res) => {
@@ -43,7 +45,74 @@ const sendOTP = async (req, res) => {
 //signUp
 const signUp = async (req, res) => {
   try {
-  } catch (err) {}
+    const {
+      firstName,
+      lastName,
+      email,
+      password,
+      confirmPassword,
+      accountType,
+      otp,
+    } = req.body;
+    if (
+      !firstName ||
+      !lastName ||
+      !email ||
+      !password ||
+      !confirmPassword ||
+      !accountType ||
+      !otp
+    ) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Fields are required.." });
+    }
+    const checkEmailInOtp = await User.findOne({ email });
+    if (checkEmailInOtp) {
+      return res.status(401).json({
+        success: false,
+        message: "User already exist please login..!!",
+      });
+    }
+    if (password !== confirmPassword) {
+      return res.status(401).json({
+        success: false,
+        message: "Password and confirmPassword does not match",
+      });
+    }
+
+    const recentOtp = OTP.findOne({ email }).sort({ createdAt: -1 }).limit(1);
+    if (recentOtp.length === 0) {
+      return res.status(400).json({ success: false, message: "OTP Not found" });
+    } else if (otp !== recentOtp.otp) {
+      return res.status(400).json({ success: false, message: "Invalid OTP" });
+    }
+
+    const profileDetail = {
+      gender: null,
+      dateOfBirth: null,
+      about: null,
+      contactNumber: null,
+    };
+    const profileResponse = await Profile.create(profileDetail);
+    const encryptPassword = bcrypt.hash(password, 10);
+    const response = await User.create({
+      firstName,
+      lastName,
+      email,
+      password: encryptPassword,
+      accountType,
+      otp: recentOtp,
+      additionalDetails: profileResponse._id,
+    });
+    res.status(200).json({
+      success: true,
+      message: "SignUp successfully",
+    });
+    console.log(response);
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
 };
 
 //Login
