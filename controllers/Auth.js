@@ -4,6 +4,7 @@ const otpGenerator = require("otp-generator");
 const bcrypt = require("bcrypt");
 const Profile = require("../models/Profile");
 var jwt = require("jsonwebtoken");
+require("dotenv").config();
 
 //sendOTP
 const sendOTP = async (req, res) => {
